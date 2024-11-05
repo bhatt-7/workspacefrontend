@@ -36,6 +36,7 @@ import { Topbar } from '../../../components/topbar';
 import usePagination from '../../../hooks/use-pagination';
 import { ProfileDropdownButton } from '../../../components/profile';
 import { ProfileModal } from '../../../components/profile-modal';
+import { TypingIndicator } from '../../../components/TypingIndicator';
 
 const appStoreSelector = (state: AppState) => ({
 	disabled: state.disabled,
@@ -54,7 +55,7 @@ const appStoreSelector = (state: AppState) => ({
 	channelUsersData: state.channelUsersData,
 	activeWorkspaceId: state.activeWorkspaceId,
 	activeChannelId: state.activeChannelId,
-
+	isTyping: state.isTyping,
 	getWorkspaces: state.getWorkspaces,
 	setCurrentWorkspace: state.setCurrentWorkspace,
 
@@ -74,6 +75,7 @@ const appStoreSelector = (state: AppState) => ({
 	getNextMessages: state.getNextMessages,
 	getReplies: state.getReplies,
 	createMessage: state.createMessage,
+	createUserTyping: state.createUserTyping,
 	editMessage: state.editMessage,
 	editReply: state.editReply,
 	createReply: state.createReply,
@@ -96,6 +98,7 @@ const appStoreSelector = (state: AppState) => ({
 	deleteChannel: state.deleteChannel,
 	logout: state.logout,
 	setProfile: state.setProfile,
+	setIsTyping: state.setIsTyping,
 	getProfileUploadUrl: state.getProfileUploadUrl,
 });
 
@@ -127,6 +130,7 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 		workspaces,
 		channels,
 		dms,
+		// isTyping,
 		messages,
 		userActivity,
 		channelUsersData,
@@ -147,6 +151,7 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 		getNextMessages,
 		getReplies,
 		createMessage,
+		createUserTyping,
 		editMessage,
 		editReply,
 		createReply,
@@ -172,6 +177,7 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 		deleteChannel,
 		logout,
 		setProfile,
+		// setIsTyping,
 		getProfileUploadUrl,
 	} = useAppStore(appStoreSelector);
 
@@ -184,6 +190,7 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 	const isUnreadDividerMsgIdRef = useRef<string | undefined>('');
 	const currentDayRef = useRef<number>(0);
 
+	const [isTyping, setIsTyping] = useState<boolean>(false);
 	const [appLoadProgress, setAppLoadProgress] = useState<number>(0);
 	const [loadProgressText, setLoadProgressText] = useState<string>('Initializing connection and getting data...');
 	const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
@@ -372,10 +379,8 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 
 	const goToBottom = useCallback(async () => {
 		resetMessagesPagination(true, true);
-
 		if (currentChannel && currentWorkspace) {
 			await updateChannelLastSeen(currentChannel.id);
-
 			history.replace({
 				pathname: generatePath('/workspace/:workspaceId/channel/:channelId', {
 					workspaceId: currentWorkspace.id,
@@ -383,9 +388,7 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 				}),
 				search: embedSearchParam,
 			});
-
 			const mId = await getMessages(10);
-
 			resetMessagesPagination(true, true);
 			setScrollToMsgId(mId);
 		}
@@ -450,6 +453,12 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 			goToBottom();
 		}
 	}, [createMessage, goToBottom]);
+
+	const handleCreateUserTyping = useCallback(async (
+		channelIdParam: string, userId: string,
+	) => {
+		await createUserTyping(channelIdParam, userId);
+	}, [createUserTyping]);
 
 	const handleEditMessage = useCallback(async (
 		content: string, mentions: MentionItem[], attachments: any[],
@@ -740,19 +749,19 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 													sessionData?.userId === currentWorkspace?.created_by
 													&& currentChannel?.type !== ChannelKind.Private
 												) ? (
-													<>
-														<Tooltip placement="left" title="Settings">
-															<Button
-																type="link"
-																onClick={() => setIsChannelPermissionModalVisible(true)}
-															>
-																<SettingOutlined
-																	style={{ fontSize: '20px', color: '#8d8d8d' }}
-																/>
-															</Button>
-														</Tooltip>
-													</>
-												) : ''}
+												<>
+													<Tooltip placement="left" title="Settings">
+														<Button
+															type="link"
+															onClick={() => setIsChannelPermissionModalVisible(true)}
+														>
+															<SettingOutlined
+																style={{ fontSize: '20px', color: '#8d8d8d' }}
+															/>
+														</Button>
+													</Tooltip>
+												</>
+											) : ''}
 										</div>
 									)}
 								>
@@ -924,12 +933,16 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 												|| currentChannel.created_by === sessionData?.userId
 											) ? (
 												<div className={styles.messageEditorContainer}>
+													{isTyping
+														&& <TypingIndicator userid={sessionData?.userId} />}
 													<MessageEditor
 														users={
 															currentChannel.type !== ChannelKind.Private ? mentionUsers : []
 														}
+														name={sessionData.displayname}
 														sessionData={sessionData}
 														createMessage={handleCreateMessage}
+														createUserTyping={handleCreateUserTyping}
 														uploadAttachment={uploadAttachment}
 														messageEditId={messageEditId}
 														setMessageEditId={setMessageEditId}
@@ -939,6 +952,8 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 														messageReplyId={messageReplyId}
 														editReplyObj=""
 														channelUsers={channelUsersData}
+														isTyping={isTyping}
+														setIsTyping={setIsTyping}
 														isSidebarEmbed={isSidebarEmbed}
 														getUsersListByNamePrefix={getUsersListByNamePrefix}
 														activeChannelId={activeChannelId}
@@ -951,8 +966,10 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 														users={
 															currentChannel.type !== ChannelKind.Private ? mentionUsers : []
 														}
+														name={sessionData.displayname}
 														sessionData={sessionData}
 														createMessage={handleCreateMessage}
+														createUserTyping={handleCreateUserTyping}
 														uploadAttachment={uploadAttachment}
 														messageEditId={messageEditId}
 														setMessageEditId={setMessageEditId}
@@ -964,6 +981,8 @@ export const WorkspacesMain: React.FunctionComponent<WorkspacesMainProps> = (pro
 														channelUsers={channelUsersData}
 														isSidebarEmbed={isSidebarEmbed}
 														isDisabled
+														isTyping={isTyping}
+														setIsTyping={setIsTyping}
 														getUsersListByNamePrefix={getUsersListByNamePrefix}
 														activeChannelId={activeChannelId}
 														activeChannelType={currentChannel.type}

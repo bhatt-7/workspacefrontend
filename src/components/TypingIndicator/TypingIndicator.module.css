@@ -1,0 +1,38 @@
+.typingIndicator {
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-size: 14px;
+    color: grey;
+}
+
+.dotsContainer {
+    display: flex;
+    margin-left: 5px;
+}
+
+.dot {
+    width: 5px;
+    height: 5px;
+    margin: 0 2px;
+    border-radius: 50%;
+    background-color: grey;
+    animation: wave 1.2s infinite ease-in-out;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes wave {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}

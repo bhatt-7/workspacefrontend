@@ -29,6 +29,7 @@ import csvFile from '../../assets/img/csv.svg';
 import fileIcon from '../../assets/img/file.svg';
 import excel from '../../assets/img/excel.svg';
 import { getAttachmentImage } from '../../libs/utils';
+// import { create } from 'domain';
 
 interface Attachment {
 	url: string,
@@ -52,8 +53,11 @@ const defaultMessageInputValue: MessageInputValue = {
 
 interface MessageEditorProps {
 	isSidebarEmbed?: boolean
+	isTyping: boolean
 	sessionData: any | null
 	users: any | null
+	name: string
+	channelId?: string
 	editMessageObj: any | null
 	editReplyObj: any | null
 	isReplyInput?: boolean
@@ -63,7 +67,9 @@ interface MessageEditorProps {
 	isDisabled?: boolean
 	activeChannelId?: string
 	activeChannelType: number | string
+	setIsTyping: (isTyping: boolean) => void
 	createMessage?: (content: string, mentions: MentionItem[], attachments: any[]) => Promise<void>
+	createUserTyping?: (channelId: string, userId: string, name: string) => Promise<void>
 	uploadAttachment?: (data: unknown) => Promise<string>
 	setMessageEditId: (messageId: string) => void
 	setMessageReplyId: (messageId: string) => void
@@ -79,9 +85,13 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 		sessionData,
 		users,
 		isReplyInput,
+		isTyping,
+		setIsTyping,
 		channelUsers,
+		channelId,
 		isDisabled,
 		createMessage,
+		createUserTyping,
 		uploadAttachment,
 		messageEditId,
 		setMessageEditId,
@@ -93,11 +103,11 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 		handleEditReply,
 		getUsersListByNamePrefix,
 		activeChannelId,
+		name,
 		activeChannelType,
 	} = props;
 
 	const messageInputRef = useRef<HTMLTextAreaElement>(null);
-
 	const [mentionSuggestionBoxElement, setMentionSuggestionBoxElement] = useState<Element>();
 	const mentionSuggestionsRef = useCallback((node: HTMLDivElement) => {
 		if (node) {
@@ -147,8 +157,8 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 
 			if (editMessageObj.mentions && editMessageObj.mentions.length) {
 				editMessageObj.mentions.forEach((val: any) => {
-					const name = val.display.slice(1);
-					inputValue = inputValue.replace(val.display, `@[${name}](${val.id})`);
+					const names = val.display.slice(1);
+					inputValue = inputValue.replace(val.display, `@[${names}](${val.id})`);
 				});
 			}
 
@@ -175,8 +185,8 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 
 			if (editReplyObj.mentions && editReplyObj.mentions.length) {
 				editReplyObj.mentions.forEach((val: any) => {
-					const name = val.display.slice(1);
-					inputValue = inputValue.replace(val.display, `@[${name}](${val.id})`);
+					const names = val.display.slice(1);
+					inputValue = inputValue.replace(val.display, `@[${names}](${val.id})`);
 				});
 			}
 
@@ -201,6 +211,12 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 	}, [editMessageObj, editReplyObj]);
 
 	useEffect(() => {
+		if (isTyping) {
+			console.log('isTyping', isTyping);
+		}
+	}, [isTyping, messageInputValue.plainTextValue]);
+
+	useEffect(() => {
 		if (messageInputRef.current) {
 			messageInputRef.current.style.height = '1px';
 			const height = messageInputRef.current?.scrollHeight;
@@ -210,13 +226,20 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 
 	const handleMessageInputChange = useCallback(
 		(_: unknown, newValue: string, newPlainTextValue: string, mentions: MentionItem[]) => {
+			console.log('newPlainTextValue', newPlainTextValue);
+			setIsTyping(true);
+			if (activeChannelId && sessionData?.userId) {
+				createUserTyping?.(activeChannelId, sessionData.userId, name);
+			}
 			setMessageInputValue({
 				value: newValue,
 				plainTextValue: newPlainTextValue,
 				mentions,
 				attachments: messageInputValue.attachments,
 			});
-		}, [messageInputValue],
+		},
+		[messageInputValue, activeChannelId, sessionData?.userId, createUserTyping, setIsTyping,
+		name],
 	);
 
 	const handleAddEmojiToInput = useCallback(
@@ -338,7 +361,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 				className={styles.emojiPicker}
 				tabIndex={0}
 				role="button"
-				onKeyUp={(ev) => {}}
+				onKeyUp={(ev) => { }}
 				onClick={(event) => {
 					event.stopPropagation();
 				}}
@@ -618,8 +641,8 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 									title={isDisabled ? '' : 'Add Emoji'}
 								>
 									<Popover
-											content={isDisabled ? '' : emojiContent}
-											trigger="onclick"
+										content={isDisabled ? '' : emojiContent}
+										trigger="onclick"
 									>
 										<Button
 											type="text"
@@ -628,7 +651,7 @@ export const MessageEditor: React.FC<MessageEditorProps> = (props) => {
 											disabled={isDisabled}
 											icon={(
 												<SmileOutlined
-												style={{ fontSize: '22px', color: '#00000070' }}
+													style={{ fontSize: '22px', color: '#00000070' }}
 												/>
 											)}
 										/>

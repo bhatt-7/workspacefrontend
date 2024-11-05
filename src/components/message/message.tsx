@@ -31,6 +31,7 @@ interface MessageProps {
 	repliesVisible?: boolean
 	isSidebarEmbed?: boolean
 	sessionData: any | null
+	isTyping?: boolean
 	message: any | null
 	currentChannelPermission: any | null
 	currentChannelType: any | null
@@ -88,6 +89,7 @@ interface MessageProps {
 
 	handleDMUser?: (userId: string) => Promise<void>
 
+	setIsTyping?: (isTyping: boolean) => void
 	getReplies: (messageId: string) => Promise<void>
 	uploadAttachment: (data: unknown) => Promise<string>
 	setRepliesVisible: (messageId?: string) => void
@@ -136,6 +138,8 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>((props, fo
 		copyMessageLink,
 		getUsersListByNamePrefix,
 		activeChannelId,
+		isTyping,
+		setIsTyping,
 	} = props;
 
 	const repliesContainerRef = useRef<HTMLDivElement>(null);
@@ -454,7 +458,7 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>((props, fo
 							</Tooltip>
 							{
 								currentChannelType !== ChannelKind.Private
-								&& message?.created_by?._id !== sessionData.userId
+									&& message?.created_by?._id !== sessionData.userId
 									? (
 										<>
 											{message?.notify_user_ids?.includes(sessionData?.userId) ? (
@@ -485,8 +489,8 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>((props, fo
 									) : null
 							}
 							{message.id === currentChannelPinnedMessageId
-							&& currentChannelType !== ChannelKind.Private
-							&& sessionData?.role !== '1'
+								&& currentChannelType !== ChannelKind.Private
+								&& sessionData?.role !== '1'
 								? (
 									<Popconfirm
 										title="Unpin this message"
@@ -794,7 +798,7 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>((props, fo
 								style={{
 									color: `${currentChannelLikedMessageIds?.includes(message?.id)
 										? '#DE6834' : ''
-									}`,
+										}`,
 								}}
 							>
 								{message?.likedByCount ? (
@@ -834,95 +838,101 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>((props, fo
 				{
 					repliesVisible && (message.status === MessageEventKind.Add
 						|| message.status === MessageEventKind.Edit) ? (
-							<div className={styles.repliesContainer} ref={repliesContainerRef}>
-								{message?.repliesLoader ? (
-									<Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
-								) : (
-									<div className={styles.repliesList}>
-										{
-											message.replies?.map((reply: any) => (
-												<Reply
-													key={reply.id}
-													sessionData={sessionData}
-													message={reply}
-													messageParent={message}
-													deleteReply={deleteReply}
-													setMessageReplyId={setMessageReplyId}
-													messageReplyId={messageReplyId}
-													channelUsers={channelUsers}
-													currentChannelPermission={currentChannelPermission}
-													isSidebarEmbed={isSidebarEmbed}
-												/>
-											))
+						<div className={styles.repliesContainer} ref={repliesContainerRef}>
+							{message?.repliesLoader ? (
+								<Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
+							) : (
+								<div className={styles.repliesList}>
+									{
+										message.replies?.map((reply: any) => (
+											<Reply
+												key={reply.id}
+												sessionData={sessionData}
+												message={reply}
+												messageParent={message}
+												deleteReply={deleteReply}
+												setMessageReplyId={setMessageReplyId}
+												messageReplyId={messageReplyId}
+												channelUsers={channelUsers}
+												currentChannelPermission={currentChannelPermission}
+												isSidebarEmbed={isSidebarEmbed}
+											/>
+										))
+									}
+								</div>
+							)}
+
+							{(currentChannelPermission === channelWritePermissionType.everyone || sessionData?.role !== '1') ? (
+								<div className={styles.replyEditorContainer}>
+									<MessageEditor
+										name={sessionData.displayname}
+										isSidebarEmbed={isSidebarEmbed}
+										isReplyInput
+										users={
+											currentChannelType !== ChannelKind.Private ? mentionUsers : []
 										}
-									</div>
-								)}
-
-								{(currentChannelPermission === channelWritePermissionType.everyone || sessionData?.role !== '1') ? (
-									<div className={styles.replyEditorContainer}>
-										<MessageEditor
-											isSidebarEmbed={isSidebarEmbed}
-											isReplyInput
-											users={
-												currentChannelType !== ChannelKind.Private ? mentionUsers : []
-											}
-											sessionData={sessionData}
-											uploadAttachment={uploadAttachment}
-											createMessage={handleCreateReply}
-											messageEditId={messageEditId}
-											setMessageEditId={setMessageEditId}
-											editMessageObj=""
-											editMessage={async (
-												content: string, mentions: MentionItem[], attachments: any[],
-											) => {
+										sessionData={sessionData}
+										uploadAttachment={uploadAttachment}
+										createMessage={handleCreateReply}
+										messageEditId={messageEditId}
+										setMessageEditId={setMessageEditId}
+										editMessageObj=""
+										editMessage={async (
+											content: string, mentions: MentionItem[], attachments: any[],
+										) => {
 											// only in case of reply, no use of this
 											// we have to delete this
-											}}
-											setMessageReplyId={setMessageReplyId}
-											messageReplyId={messageReplyId}
-											editReplyObj={message.replies?.find((msg: any) => msg.id === messageReplyId)}
-											handleEditReply={handleEditReply}
-											channelUsers={channelUsers}
-											getUsersListByNamePrefix={getUsersListByNamePrefix}
-											activeChannelId={activeChannelId}
-											activeChannelType={currentChannelType}
-										/>
-									</div>
-								) : (
-									<div className={styles.replyEditorContainer}>
-										<MessageEditor
-											isSidebarEmbed={isSidebarEmbed}
-											isReplyInput
-											users={
-												currentChannelType !== ChannelKind.Private ? mentionUsers : []
-											}
-											sessionData={sessionData}
-											uploadAttachment={uploadAttachment}
-											createMessage={handleCreateReply}
-											messageEditId={messageEditId}
-											setMessageEditId={setMessageEditId}
-											editMessageObj=""
-											editMessage={async (
-												content: string, mentions: MentionItem[], attachments: any[],
-											) => {
+										}}
+										setMessageReplyId={setMessageReplyId}
+										messageReplyId={messageReplyId}
+										editReplyObj={message.replies?.find((msg: any) => msg.id === messageReplyId)}
+										isTyping={isTyping ?? false}
+										setIsTyping={typeof setIsTyping === 'function' ? setIsTyping : () => {}}
+										handleEditReply={handleEditReply}
+										channelUsers={channelUsers}
+										getUsersListByNamePrefix={getUsersListByNamePrefix}
+										activeChannelId={activeChannelId}
+										activeChannelType={currentChannelType}
+									/>
+								</div>
+							) : (
+								<div className={styles.replyEditorContainer}>
+									<MessageEditor
+										name={sessionData.displayname}
+										isSidebarEmbed={isSidebarEmbed}
+										isReplyInput
+										users={
+											currentChannelType !== ChannelKind.Private ? mentionUsers : []
+										}
+										sessionData={sessionData}
+										uploadAttachment={uploadAttachment}
+										createMessage={handleCreateReply}
+										messageEditId={messageEditId}
+										setMessageEditId={setMessageEditId}
+										editMessageObj=""
+										isTyping={isTyping ?? false}
+										setIsTyping={typeof setIsTyping === 'function' ? setIsTyping : () => {}}
+										editMessage={async (
+											content: string, mentions: MentionItem[], attachments: any[],
+										) => {
 											// only in case of reply, no use of this
 											// we have to delete this
-											}}
-											setMessageReplyId={setMessageReplyId}
-											messageReplyId={messageReplyId}
-											editReplyObj={message.replies?.find((msg: any) => msg.id === messageReplyId)}
-											handleEditReply={handleEditReply}
-											channelUsers={channelUsers}
-											isDisabled
-											getUsersListByNamePrefix={getUsersListByNamePrefix}
-											activeChannelId={activeChannelId}
-											activeChannelType={currentChannelType}
-										/>
-									</div>
-								)}
+										}}
+										setMessageReplyId={setMessageReplyId}
+										messageReplyId={messageReplyId}
+										editReplyObj={message.replies?.find((msg: any) => msg.id === messageReplyId)}
+										handleEditReply={handleEditReply}
+										channelUsers={channelUsers}
+										isDisabled
+										getUsersListByNamePrefix={getUsersListByNamePrefix}
+										activeChannelId={activeChannelId}
+										activeChannelType={currentChannelType}
+									/>
+								</div>
+							)}
 
-							</div>
-						) : ''
+						</div>
+					) : ''
 				}
 			</div>
 		</div>

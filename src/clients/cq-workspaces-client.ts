@@ -21,6 +21,7 @@ interface ClientEvents {
 
 	'message-received': (data: any) => void
 	'newMessage-received': (data: any) => void
+	'userTyping-received': (data: any) => void
 	'reply-received': (data: any) => void
 	'new-user-added': (data: any) => void
 	'channel-user-change': (data: any) => void
@@ -45,6 +46,7 @@ interface SocketEmitEvents {
 	leaveChannel: (data: any) => void
 	deleteChannel: (data: any) => void
 	message: (data: any) => void
+	userTyping: (data: any) => void
 	reply: (data: any) => void
 	notificationRead: (data: any) => void
 	isResolved: (data: any) => void
@@ -73,6 +75,7 @@ interface SocketListenEvents {
 	userLeftChannel: (data: any) => void
 	deleteChannel: (data: any) => void
 	newMessage: (data: any) => void
+	userTyping: (data: any) => void
 	likeMessage: (data: any) => void
 	unLikeMessage: (data: any) => void
 	channelUserDataChange: (data: any) => void
@@ -171,6 +174,11 @@ export class CQWorkspacesClient extends (EventEmitter as new () => TypedEmitter<
 		this.emit('newMessage-received', data);
 	};
 
+	private _onUserTypingReceived = (data: any): void => {
+		// console.log(data);
+		this.emit('userTyping-received', data);
+	};
+
 	private _onReplyReceived = (data: any): void => {
 		this.emit('reply-received', data);
 	};
@@ -238,6 +246,7 @@ export class CQWorkspacesClient extends (EventEmitter as new () => TypedEmitter<
 		_socket.on('disconnect', this._onSocketDisconnect);
 		_socket.on('message', this._onMessageReceived);
 		_socket.on('newMessage', this._onNewMessageReceived);
+		_socket.on('userTyping', this._onUserTypingReceived);
 		_socket.on('reply', this._onReplyReceived);
 		_socket.on('newUserAdded', this._onNewUserAdded);
 		_socket.on('channelUserChange', this._onInvitedUserAdded);
@@ -262,6 +271,7 @@ export class CQWorkspacesClient extends (EventEmitter as new () => TypedEmitter<
 		_socket.off('disconnect', this._onSocketDisconnect);
 		_socket.off('message', this._onMessageReceived);
 		_socket.off('newMessage', this._onNewMessageReceived);
+		_socket.off('userTyping', this._onUserTypingReceived);
 		_socket.off('reply', this._onReplyReceived);
 		_socket.off('newUserAdded', this._onNewUserAdded);
 		_socket.off('channelUserChange', this._onNewUserAdded);
@@ -599,7 +609,7 @@ export class CQWorkspacesClient extends (EventEmitter as new () => TypedEmitter<
 		args: {
 			userIds: [],
 		},
-	) : Promise<any> => {
+	): Promise<any> => {
 		const { userIds } = args;
 		const response = await this._workspacesAPI.post('/channel/channelUsersData', {
 			userIds,
@@ -616,7 +626,7 @@ export class CQWorkspacesClient extends (EventEmitter as new () => TypedEmitter<
 			workspaceId: string, channelId: string,
 			inviteLinkSuffix: string,
 		},
-	) : Promise<any> => {
+	): Promise<any> => {
 		const { channelId, workspaceId, inviteLinkSuffix } = args;
 		const response = await this._workspacesAPI.post('/channel/editInviteLink', {
 			channelId,
@@ -737,6 +747,32 @@ export class CQWorkspacesClient extends (EventEmitter as new () => TypedEmitter<
 		}
 
 		return response.data;
+	};
+
+	// createUserTyping = async (channelId: string, userId: string): Promise<any> => {
+	// 	if (!this.connected) {
+	// 		throw new Error('please check your connection!');
+	// 	}
+	// 	console.log('userid = ', userId);
+	// 	console.log('channelid = ', channelId);
+	// 	this._socket.emit('userTyping', {
+	// 		channelId,
+	// 		userId,
+	// 	});
+	// };
+
+	createUserTyping = async (channelId: string, userId: string, name: string): Promise<any> => {
+		if (!this.connected) {
+			throw new Error('please check your connection!');
+		}
+		console.log('userid = ', userId);
+		console.log('channelid = ', channelId);
+		console.log('name--------', name);
+		this._socket.emit('userTyping', {
+			channelId,
+			userId,
+			name,
+		});
 	};
 
 	createMessage = async (

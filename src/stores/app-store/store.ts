@@ -30,7 +30,9 @@ export interface AppState {
 	currentWorkspace: any | null
 	workspaces: any[] | null
 	channels: any[] | null
+	isTyping: boolean
 	dms: any[] | null
+	typerName: string
 	currentChannel: any | null
 	likedMessageIds: any | null
 	messages: any | null
@@ -49,7 +51,7 @@ export interface AppState {
 	validatePasswordResetToken: (token: string) => Promise<void>
 	resetPassword: (resetPasswordPayload: { password: string, token: string }) => Promise<void>
 	logout: () => Promise<void>
-
+	setIsTyping: (isTyping: boolean) => void
 	setCurrentWorkspace: (workspaceId: string) => Promise<boolean>
 	createWorkspace: (name: string, userIdsToAdd?: string[]) => Promise<string>
 	getWorkspaces: (
@@ -79,6 +81,7 @@ export interface AppState {
 	getNextMessages: (limit: number) => Promise<boolean>
 	getReplies: (messageId: string) => Promise<void>
 	createMessage: (content: string, mentions: MentionItem[], attachments: any[]) => Promise<boolean>
+	createUserTyping: (channelId: string, userId: string) => Promise<void>
 	editMessage: (content: string, mentions: MentionItem[], attachments: any[],
 		messageEditId: string | undefined) => Promise<void>
 
@@ -167,8 +170,10 @@ const initialState: AppState = {
 	appLoading: false,
 	appLoadingText: '',
 	channelsLoading: false,
+	isTyping: false,
 	messagesLoading: false,
 	sessionData: null,
+	typerName: '',
 	connected: false,
 	currentWorkspace: null,
 	workspaces: null,
@@ -212,9 +217,9 @@ const initialState: AppState = {
 	getNextMessages: async () => false,
 	getReplies: async () => { },
 	createMessage: async () => false,
+	createUserTyping: async () => { },
 	editMessage: async () => { },
 	editReply: async () => { },
-
 	createReply: async () => { },
 	deleteMessage: async () => { },
 	verifyMessage: async () => { },
@@ -235,8 +240,9 @@ const initialState: AppState = {
 	getBatchUserIds: async () => { },
 	leaveChannel: async (id: string) => false,
 	getProfileUploadUrl: () => '',
-	setProfile: async () => {},
-	deleteChannel: async () => {},
+	setProfile: async () => { },
+	setIsTyping: async () => { },
+	deleteChannel: async () => { },
 };
 
 export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore<AppState> {
@@ -583,7 +589,7 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 					const message = state.messages?.find(
 						(msg: any) => msg.id === data.payload.replytoparentid,
 					);
-					if (!message)		return;
+					if (!message) return;
 					const rply = message.replies?.find((rpl: any) => rpl.id === data.payload.messageId);
 					rply.content = data.payload.content;
 					rply.status = data.payload.eventType;
@@ -596,7 +602,7 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 			if (data.payload.eventType === ReplyEventKind.Delete) {
 				set((state) => {
 					const message = state.messages?.find((msg: any) => msg.id === data.payload.mid);
-					if (!message)		return;
+					if (!message) return;
 					const rply = message.replies?.find((rpl: any) => rpl.id === data.payload.messageId);
 					rply.status = data.payload.eventType;
 					rply.deleted_at = data.payload.time;
@@ -609,7 +615,7 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 					const { messages, channelUsersData } = state;
 
 					const message = messages?.find((msg: any) => msg.id === data.payload.parentIdOfReply);
-					if (!message)		return;
+					if (!message) return;
 					message.is_resolved = false;
 
 					if (message.replyids) {
@@ -888,6 +894,25 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 			}
 		});
 
+		// cqWorkspacesClient.on('userTyping-received', async (data: any) => {
+		// 	console.log('isTyping', data.isTyping);
+		// 	set((state) => {
+		// 		if (data.isTyping) {
+		// 			return { ...state, isTyping: true };
+		// 		}
+		// 		return state;
+		// 	});
+		// });
+
+		cqWorkspacesClient.on('userTyping-received', async (data: any) => {
+			// console.log(sessionData.displayname);
+			console.log('isTyping', data.isTyping);
+			console.log('name', data.name);
+			const { sessionData } = get();
+			console.log(sessionData.displayname);
+			set((state) => ({ ...state, isTyping: data.isTyping, typerName: data.name }));
+		});
+
 		cqWorkspacesClient.on('newMessage-received', async (data: any) => {
 			if (data?.isEdit) return;
 			set((state) => {
@@ -921,7 +946,7 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 			const { messages, channelUsersData, currentChannel } = get();
 			if (currentChannel.id === data.channelId) {
 				let foundMsg = messages?.find((msg: any) => msg.id === data.messageId);
-				let usersData:any = {};
+				let usersData: any = {};
 				if (!foundMsg) {
 					const dataObj = await cqWorkspacesClient.getMessages(
 						{
@@ -1021,7 +1046,7 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 					});
 					await cqWorkspacesClient.getSessionData();
 					await cqWorkspacesClient.connectSocket();
-				} catch (e:any) {
+				} catch (e: any) {
 					console.log(window.location.href);
 					logger.error(e);
 					if (e.message === 'Session Expired') {
@@ -1975,6 +2000,21 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 				return false;
 			},
 
+			createUserTyping: async (channelId: string, userId: string) => {
+				try {
+					if (!channelId || !userId) {
+						return;
+					}
+					const { sessionData } = get();
+					// const name = sessionData.displayname;
+					// logger.log('user typing', channelId, userId);
+					console.log('user typing', sessionData.displayname, sessionData.userId);
+					const name = sessionData?.displayname;
+					await cqWorkspacesClient.createUserTyping(channelId, userId, name);
+				} catch (e) {
+					logger.error(e);
+				}
+			},
 			createMessage: async (content: string, mentions: MentionItem[], attachments: any[]) => {
 				try {
 					if (!content && !attachments.length) {
@@ -2239,7 +2279,7 @@ export function createAppStore(cqWorkspacesClient: CQWorkspacesClient): UseStore
 
 			getBatchUserIds: async (batchIds: string[]) => {
 				try {
-					if (batchIds.length === 0)	return { batchesArr: [] };
+					if (batchIds.length === 0) return { batchesArr: [] };
 					const batchesArr = await cqWorkspacesClient.getBatchUserIds(batchIds);
 					return batchesArr;
 				} catch (e) {

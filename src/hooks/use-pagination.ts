@@ -154,10 +154,10 @@ export default function usePagination(
 			});
 			lastHtmlElementRef.current = lastDataNodeContainer;
 		}, [
-			scrollToDataNodeId, firstDataNodeContainer, lastDataNodeContainer, dataListContainer,
-			getPrevData, getNextData, scrollToCurrentDataNode, upScrollAllowed,
-			scrollToEnd, goToBottomVisible, scrollToContainer,
-		],
+		scrollToDataNodeId, firstDataNodeContainer, lastDataNodeContainer, dataListContainer,
+		getPrevData, getNextData, scrollToCurrentDataNode, upScrollAllowed,
+		scrollToEnd, goToBottomVisible, scrollToContainer,
+	],
 	), 500, {
 		leading: true,
 	});
